@@ -14,8 +14,8 @@ Unix and Windows. The target API language is C 89. In addition:
   than necessary, and should not be larger (in lines of code)
   than needed.
 
-- This library should provide a fallback in case of unavailability of
-  memory mapping on a used platform.
+- The library should return error values where appropriate, without
+  causing an application to abruptly terminate.
 
 ## Build
 
