@@ -22,11 +22,17 @@
 extern "C" {
 #endif /*__cplusplus*/
 
+/**
+ * \brief Operating system identifier.
+ */
 enum mmapio_os {
   mmapio_os_none = 0,
   mmapio_os_unix = 1
 };
 
+/**
+ * \brief File memory access modes.
+ */
 enum mmapio_mode {
   mmapio_mode_read = 0x72,
   mmapio_mode_write = 0x77,
