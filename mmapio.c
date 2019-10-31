@@ -16,6 +16,7 @@ struct mmapio_mode_tag {
   char mode;
   char end;
   char privy;
+  char bequeath;
 };
 
 /**
@@ -26,13 +27,16 @@ struct mmapio_mode_tag {
 static struct mmapio_mode_tag mmapio_mode_parse(char const* mmode);
 
 #define MMAPIO_OS_UNIX 1
+#define MMAPIO_OS_WIN32 2
 
 /*
  * inspired by https://stackoverflow.com/a/30971057
  * and https://stackoverflow.com/a/11351171
  */
 #ifndef MMAPIO_OS
-#  if (defined __unix__) || (defined(__APPLE__)&&defined(__MACH__))
+#  if (defined _WIN32)
+#    define MMAPIO_OS MMAPIO_OS_WIN32
+#  elif (defined __unix__) || (defined(__APPLE__)&&defined(__MACH__))
 #    define MMAPIO_OS MMAPIO_OS_UNIX
 #  else
 #    define MMAPIO_OS 0
@@ -130,11 +134,110 @@ static void mmapio_mmi_release(struct mmapio_i* m, void* p);
  * \return the length of the mapped region exposed by this interface
  */
 static size_t mmapio_mmi_length(struct mmapio_i const* m);
+#elif MMAPIO_OS == MMAPIO_OS_WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#  include <limits.h>
+#  include <errno.h>
+
+struct mmapio_win32 {
+  struct mmapio_i base;
+  void* ptr;
+  size_t len;
+  size_t shift;
+  HANDLE fmd;
+  HANDLE fd;
+};
+
+/**
+ * \brief Convert a mmapio mode text to a `CreateFile.` desired access flag.
+ * \param mmode the value to convert
+ * \return an `CreateFile.` desired access flag on success, zero otherwise
+ */
+static DWORD mmapio_mode_rw_cvt(int mmode);
+
+/**
+ * \brief Convert UTF-8 encoded text to UTF-16 LE text.
+ * \param nm file name encoded in UTF-8
+ * \param out output string
+ * \param outlen output length
+ * \return an errno code
+ */
+static int mmapio_u8towc_shim
+  (unsigned char const* nm, wchar_t* out, size_t* outlen);
+
+/**
+ * \brief Convert UTF-8 encoded text to UTF-16 LE text.
+ * \param nm file name encoded in UTF-8
+ * \return a wide string on success, NULL otherwise
+ */
+static wchar_t* mmapio_u8towc(unsigned char const* nm);
+
+/**
+ * \brief Finish preparing a memory map interface.
+ * \param fd file handle
+ * \param mmode mode text
+ * \param sz size of range to map
+ * \param off offset from start of file
+ * \return an interface on success, NULL otherwise
+ */
+static struct mmapio_i* mmapio_open_rest
+  (HANDLE fd, struct mmapio_mode_tag const mmode, size_t sz, size_t off);
+
+/**
+ * \brief Fetch a file size from a file descriptor.
+ * \param fd target file handle
+ * \return a file size, or zero on failure
+ */
+static size_t mmapio_file_size_e(HANDLE fd);
+
+/**
+ * \brief Convert a mmapio mode text to a
+ *   `CreateFileMapping.` protection flag.
+ * \param mmode the value to convert
+ * \return a `CreateFileMapping.` protection flag on success, zero otherwise
+ */
+static DWORD mmapio_mode_prot_cvt(int mmode);
+
+/**
+ * \brief Convert a mmapio mode text to a `MapViewOfFile`
+ *   desired access flag.
+ * \param mmode the value to convert
+ * \return a `MapViewOfFile` desired access flag on success, zero otherwise
+ */
+static DWORD mmapio_mode_access_cvt(struct mmapio_mode_tag const mt);
+
+/**
+ * \brief Destructor; closes the file and frees the space.
+ * \param m map instance
+ */
+static void mmapio_mmi_dtor(struct mmapio_i* m);
+
+/**
+ * \brief Acquire a lock to the space.
+ * \param m map instance
+ * \return pointer to locked space on success, NULL otherwise
+ */
+static void* mmapio_mmi_acquire(struct mmapio_i* m);
+
+/**
+ * \brief Release a lock of the space.
+ * \param m map instance
+ * \param p pointer of region to release
+ */
+static void mmapio_mmi_release(struct mmapio_i* m, void* p);
+
+/**
+ * \brief Check the length of the mapped area.
+ * \param m map instance
+ * \return the length of the mapped region exposed by this interface
+ */
+static size_t mmapio_mmi_length(struct mmapio_i const* m);
 #endif /*MMAPIO_OS*/
 
 /* BEGIN static functions */
 struct mmapio_mode_tag mmapio_mode_parse(char const* mmode) {
-  struct mmapio_mode_tag out = { 0, 0, 0 };
+  struct mmapio_mode_tag out = { 0, 0, 0, 0 };
   int i;
   for (i = 0; i < 8; ++i) {
     switch (mmode[i]) {
@@ -151,6 +254,9 @@ struct mmapio_mode_tag mmapio_mode_parse(char const* mmode) {
       break;
     case mmapio_mode_private:
       out.privy = mmapio_mode_private;
+      break;
+    case mmapio_mode_bequeath:
+      out.bequeath = mmapio_mode_bequeath;
       break;
     }
   }
@@ -303,6 +409,300 @@ size_t mmapio_mmi_length(struct mmapio_i const* m) {
   struct mmapio_unix* const mu = (struct mmapio_unix*)m;
   return mu->len-mu->shift;
 }
+#elif MMAPIO_OS == MMAPIO_OS_WIN32
+DWORD mmapio_mode_rw_cvt(int mmode) {
+  switch (mmode) {
+  case mmapio_mode_write:
+    return GENERIC_READ|GENERIC_WRITE;
+  case mmapio_mode_read:
+    return GENERIC_READ;
+  default:
+    return 0;
+  }
+}
+
+int mmapio_u8towc_shim
+  (unsigned char const* nm, wchar_t* out, size_t* outlen)
+{
+  size_t n = 0;
+  unsigned char const* p;
+  static size_t const sz_max = UINT_MAX/2u-4u;
+  for (p = nm; *p && n < sz_max; ++p) {
+    unsigned char const v = *p;
+    if (n >= sz_max) {
+      return ERANGE;
+    }
+    if (v < 0x80) {
+      /* Latin-1 compatibility */
+      if (out != NULL) {
+        out[n] = v;
+      }
+      n += 1;
+    } else if (v < 0xC0) {
+      return EILSEQ;
+    } else if (v < 0xE0) {
+      /* check extension codes */
+      unsigned int i;
+      unsigned long int qv = v&31;
+      for (i = 0; i < 1; ++i) {
+        unsigned char const v1 = *(p+i);
+        if (v1 < 0x80 || v1 >= 0xC0) {
+          return EILSEQ;
+        } else qv = (qv<<6)|(v1&63);
+      }
+      if (out != NULL) {
+        out[n] = (wchar_t)qv;
+      }
+      n += 1;
+      p += 1;
+    } else if (v < 0xF0) {
+      /* check extension codes */
+      unsigned int i;
+      unsigned long int qv = v&15;
+      for (i = 0; i < 2; ++i) {
+        unsigned char const v1 = *(p+i);
+        if (v1 < 0x80 || v1 >= 0xC0) {
+          return EILSEQ;
+        } else qv = (qv<<6)|(v1&63);
+      }
+      if (out != NULL) {
+        out[n] = (wchar_t)qv;
+      }
+      n += 1;
+      p += 2;
+    } else if (v < 0xF8) {
+      /* check extension codes */
+      unsigned int i;
+      unsigned long int qv = v&3;
+      for (i = 0; i < 3; ++i) {
+        unsigned char const v1 = *(p+i);
+        if (v1 < 0x80 || v1 >= 0xC0) {
+          return EILSEQ;
+        } else qv = (qv<<6)|(v1&63);
+      }
+      if (qv >= 0x10FFFFL) {
+        return EILSEQ;
+      }
+      if (out != NULL) {
+        qv -= 0x10000;
+        out[n] = (wchar_t)(0xD800 | ((qv>>10)&1023));
+        out[n+1] = (wchar_t)(0xDC00 | (qv&1023));
+      }
+      n += 2;
+      p += 3;
+    } else {
+      return EILSEQ; /* since beyond U+1FFFFF, no valid UTF-16 encoding */
+    }
+  }
+  (*outlen) = n;
+  return 0;
+}
+
+wchar_t* mmapio_u8towc(unsigned char const* nm) {
+  /* use in-house wide character conversion */
+  size_t ns;
+  wchar_t* out;
+  /* try the length */{
+    int err = mmapio_u8towc_shim(nm, NULL, &ns);
+    if (err != 0) {
+      /* conversion error caused by bad sequence, so */return NULL;
+    }
+  }
+  out = (wchar_t*)calloc(ns+1, sizeof(wchar_t));
+  if (out != NULL) {
+    mmapio_u8towc_shim(nm, out, &ns);
+    out[ns] = 0;
+  }
+  return out;
+}
+
+size_t mmapio_file_size_e(HANDLE fd) {
+  LARGE_INTEGER sz;
+  BOOL res = GetFileSizeEx(fd, &sz);
+  if (res) {
+#if (defined ULLONG_MAX)
+    return (size_t)sz.QuadPart;
+#else
+    return (size_t)((sz.u.LowPart)|(sz.u.HighPart<<32));
+#endif /*ULLONG_MAX*/
+  } else return 0u;
+}
+
+DWORD mmapio_mode_prot_cvt(int mmode) {
+  switch (mmode) {
+  case mmapio_mode_write:
+    return PAGE_READWRITE;
+  case mmapio_mode_read:
+    return PAGE_READONLY;
+  default:
+    return 0;
+  }
+}
+
+DWORD mmapio_mode_access_cvt(struct mmapio_mode_tag const mt) {
+  DWORD flags = 0;
+  switch (mt.mode) {
+  case mmapio_mode_write:
+    flags = FILE_MAP_READ|FILE_MAP_WRITE;
+    break;
+  case mmapio_mode_read:
+    flags = FILE_MAP_READ;
+    break;
+  default:
+    return 0;
+  }
+  if (mt.privy) {
+    flags |= FILE_MAP_COPY;
+  }
+  return flags;
+}
+
+struct mmapio_i* mmapio_open_rest
+  (HANDLE fd, struct mmapio_mode_tag const mt, size_t sz, size_t off)
+{
+  /*
+   * based on
+   * https://docs.microsoft.com/en-us/windows/win32/memory/
+   *   creating-a-view-within-a-file
+   */
+  struct mmapio_win32 *const out = calloc(1, sizeof(struct mmapio_win32));
+  void *ptr;
+  size_t fullsize;
+  size_t fullshift;
+  size_t fulloff;
+  size_t extended_size;
+  size_t const size_clamp = mmapio_file_size_e(fd);
+  HANDLE fmd;
+  SECURITY_ATTRIBUTES cfmsa;
+  if (out == NULL) {
+    CloseHandle(fd);
+    return NULL;
+  }
+  if (mt.end) /* fix map size */{
+    size_t const xsz = size_clamp;
+    if (xsz < off) {
+      /* reject non-ending zero parameter */
+      CloseHandle(fd);
+      free(out);
+      return NULL;
+    } else sz = xsz-off;
+  } else if (sz == 0) {
+    /* reject non-ending zero parameter */
+    CloseHandle(fd);
+    free(out);
+    return NULL;
+  }
+  /* fix to allocation granularity */{
+    DWORD psize;
+    /* get the allocation granularity */{
+      SYSTEM_INFO s_info;
+      GetSystemInfo(&s_info);
+      psize = s_info.dwAllocationGranularity;
+    }
+    fullsize = sz;
+    if (psize > 0) {
+      /* adjust the offset */
+      fullshift = off%psize;
+      fulloff = (off-fullshift);
+      if (fullshift >= ((~(size_t)0u)-sz)) {
+        /* range fix failure */
+        CloseHandle(fd);
+        free(out);
+        errno = ERANGE;
+        return NULL;
+      } else fullsize += fullshift;
+      /* adjust the size */{
+        size_t size_shift = (fullsize % psize);
+        if (size_shift > 0) {
+          extended_size = fullsize + (psize - size_shift);
+        } else extended_size = fullsize;
+      }
+    } else {
+      fulloff = off;
+      extended_size = sz;
+    }
+  }
+  /* prepare the security attributes */{
+    memset(&cfmsa, 0, sizeof(cfmsa));
+    cfmsa.nLength = sizeof(cfmsa);
+    cfmsa.lpSecurityDescriptor = NULL;
+    cfmsa.bInheritHandle = (BOOL)(mt.bequeath ? TRUE : FALSE);
+  }
+  /* create the file mapping object */{
+    /*
+     * clamp size to end of file;
+     * based on https://stackoverflow.com/a/46014637
+     */
+    size_t const fullextent = size_clamp > extended_size+fulloff
+        ? extended_size + fulloff
+        : size_clamp;
+    fmd = CreateFileMappingA(
+        fd, /*hFile*/
+        &cfmsa, /*lpFileMappingAttributes*/
+        mmapio_mode_prot_cvt(mt.mode), /*flProtect*/
+        (DWORD)((fullextent>>32)&0xFFffFFff), /*dwMaximumSizeHigh*/
+        (DWORD)(fullextent&0xFFffFFff), /*dwMaximumSizeLow*/
+        NULL /*lpName*/
+      );
+  }
+  if (fmd == NULL) {
+    /* file mapping failed */
+    CloseHandle(fd);
+    free(out);
+    return NULL;
+  }
+  ptr = MapViewOfFile(
+      fmd, /*hFileMappingObject*/
+      mmapio_mode_access_cvt(mt), /*dwDesiredAccess*/
+      (DWORD)((fulloff>>32)&0xFFffFFff), /* dwFileOffsetHigh */
+      (DWORD)(fulloff&0xFFffFFff), /* dwFileOffsetLow */
+      (SIZE_T)(fullsize) /* dwNumberOfBytesToMap */
+    );
+  if (ptr == NULL) {
+    CloseHandle(fmd);
+    CloseHandle(fd);
+    free(out);
+    return NULL;
+  }
+  /* initialize the interface */{
+    out->ptr = ptr;
+    out->len = fullsize;
+    out->fd = fd;
+    out->fmd = fmd;
+    out->shift = fullshift;
+    out->base.mmi_dtor = &mmapio_mmi_dtor;
+    out->base.mmi_acquire = &mmapio_mmi_acquire;
+    out->base.mmi_release = &mmapio_mmi_release;
+    out->base.mmi_length = &mmapio_mmi_length;
+  }
+  return (struct mmapio_i*)out;
+}
+
+void mmapio_mmi_dtor(struct mmapio_i* m) {
+  struct mmapio_win32* const mu = (struct mmapio_win32*)m;
+  UnmapViewOfFile(mu->ptr);
+  mu->ptr = NULL;
+  CloseHandle(mu->fmd);
+  mu->fmd = NULL;
+  CloseHandle(mu->fd);
+  mu->fd = NULL;
+  free(mu);
+  return;
+}
+
+void* mmapio_mmi_acquire(struct mmapio_i* m) {
+  struct mmapio_win32* const mu = (struct mmapio_win32*)m;
+  return mu->ptr+mu->shift;
+}
+
+void mmapio_mmi_release(struct mmapio_i* m, void* p) {
+  return;
+}
+
+size_t mmapio_mmi_length(struct mmapio_i const* m) {
+  struct mmapio_win32* const mu = (struct mmapio_win32*)m;
+  return mu->len-mu->shift;
+}
 #endif /*MMAPIO_OS*/
 /* END   static functions */
 
@@ -372,6 +772,84 @@ struct mmapio_i* mmapio_wopen
   fd = open(mbfn, mmapio_mode_rw_cvt(mt.mode));
   free(mbfn);
   if (fd == -1) {
+    /* can't open file, so */return NULL;
+  }
+  return mmapio_open_rest(fd, mt, sz, off);
+}
+#elif MMAPIO_OS == MMAPIO_OS_WIN32
+struct mmapio_i* mmapio_open
+  (char const* nm, char const* mode, size_t sz, size_t off)
+{
+  HANDLE fd;
+  struct mmapio_mode_tag const mt = mmapio_mode_parse(mode);
+  SECURITY_ATTRIBUTES cfsa;
+  memset(&cfsa, 0, sizeof(cfsa));
+  cfsa.nLength = sizeof(cfsa);
+  cfsa.lpSecurityDescriptor = NULL;
+  cfsa.bInheritHandle = (BOOL)(mt.bequeath ? TRUE : FALSE);
+  fd = CreateFileA(
+      nm, mmapio_mode_rw_cvt(mt.mode),
+      FILE_SHARE_READ|FILE_SHARE_WRITE,
+      &cfsa,
+      OPEN_ALWAYS,
+      FILE_ATTRIBUTE_NORMAL,
+      NULL
+    );
+  if (fd == INVALID_HANDLE_VALUE) {
+    /* can't open file, so */return NULL;
+  }
+  return mmapio_open_rest(fd, mt, sz, off);
+}
+
+struct mmapio_i* mmapio_u8open
+  (unsigned char const* nm, char const* mode, size_t sz, size_t off)
+{
+  HANDLE fd;
+  struct mmapio_mode_tag const mt = mmapio_mode_parse(mode);
+  wchar_t* const wcfn = mmapio_u8towc(nm);
+  SECURITY_ATTRIBUTES cfsa;
+  memset(&cfsa, 0, sizeof(cfsa));
+  cfsa.nLength = sizeof(cfsa);
+  cfsa.lpSecurityDescriptor = NULL;
+  cfsa.bInheritHandle = (BOOL)(mt.bequeath ? TRUE : FALSE);
+  if (wcfn == NULL) {
+    /* conversion failure, so give up */
+    return NULL;
+  }
+  fd = CreateFileW(
+      wcfn, mmapio_mode_rw_cvt(mt.mode),
+      FILE_SHARE_READ|FILE_SHARE_WRITE,
+      &cfsa,
+      OPEN_ALWAYS,
+      FILE_ATTRIBUTE_NORMAL,
+      NULL
+    );
+  free(wcfn);
+  if (fd == INVALID_HANDLE_VALUE) {
+    /* can't open file, so */return NULL;
+  }
+  return mmapio_open_rest(fd, mt, sz, off);
+}
+
+struct mmapio_i* mmapio_wopen
+  (wchar_t const* nm, char const* mode, size_t sz, size_t off)
+{
+  HANDLE fd;
+  struct mmapio_mode_tag const mt = mmapio_mode_parse(mode);
+  SECURITY_ATTRIBUTES cfsa;
+  memset(&cfsa, 0, sizeof(cfsa));
+  cfsa.nLength = sizeof(cfsa);
+  cfsa.lpSecurityDescriptor = NULL;
+  cfsa.bInheritHandle = (BOOL)(mt.bequeath ? TRUE : FALSE);
+  fd = CreateFileW(
+      nm, mmapio_mode_rw_cvt(mt.mode),
+      FILE_SHARE_READ|FILE_SHARE_WRITE,
+      &cfsa,
+      OPEN_ALWAYS,
+      FILE_ATTRIBUTE_NORMAL,
+      NULL
+    );
+  if (fd == INVALID_HANDLE_VALUE) {
     /* can't open file, so */return NULL;
   }
   return mmapio_open_rest(fd, mt, sz, off);

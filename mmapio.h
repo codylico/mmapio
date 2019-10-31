@@ -37,7 +37,8 @@ enum mmapio_mode {
   mmapio_mode_read = 0x72,
   mmapio_mode_write = 0x77,
   mmapio_mode_end = 0x65,
-  mmapio_mode_private = 0x70
+  mmapio_mode_private = 0x70,
+  mmapio_mode_bequeath = 0x71 /* TODO check API symbol */
 };
 
 /**
