@@ -113,11 +113,9 @@ static void mmapio_mmi_dtor(struct mmapio_i* m);
 /**
  * \brief Acquire a lock to the space.
  * \param m map instance
- * \param sz size of output buffer
- * \param off offset from start of mapped region
  * \return pointer to locked space on success, NULL otherwise
  */
-static void* mmapio_mmi_acquire(struct mmapio_i* m, size_t sz, size_t off);
+static void* mmapio_mmi_acquire(struct mmapio_i* m);
 
 /**
  * \brief Release a lock of the space.
@@ -292,12 +290,9 @@ void mmapio_mmi_dtor(struct mmapio_i* m) {
   return;
 }
 
-void* mmapio_mmi_acquire(struct mmapio_i* m, size_t sz, size_t off) {
+void* mmapio_mmi_acquire(struct mmapio_i* m) {
   struct mmapio_unix* const mu = (struct mmapio_unix*)m;
-  if (off >= mu->len
-  ||  sz > mu->len-off)
-    /* failed range check, so */return NULL;
-  else return mu->ptr+off+mu->shift;
+  return mu->ptr+mu->shift;
 }
 
 void mmapio_mmi_release(struct mmapio_i* m, void* p) {
@@ -323,8 +318,8 @@ void mmapio_close(struct mmapio_i* m) {
   return;
 }
 
-void* mmapio_acquire(struct mmapio_i* m, size_t sz, size_t off) {
-  return (*m).mmi_acquire(m,sz,off);
+void* mmapio_acquire(struct mmapio_i* m) {
+  return (*m).mmi_acquire(m);
 }
 
 void mmapio_release(struct mmapio_i* m, void* p) {

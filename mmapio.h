@@ -46,11 +46,9 @@ struct mmapio_i {
   /**
    * \brief Acquire a lock to the space.
    * \param m map instance
-   * \param sz size of output buffer
-   * \param off offset from start of mapped region
    * \return pointer to locked space on success, NULL otherwise
    */
-  void* (*mmi_acquire)(struct mmapio_i* m, size_t sz, size_t off);
+  void* (*mmi_acquire)(struct mmapio_i* m);
   /**
    * \brief Release a lock of the space.
    * \param m map instance
@@ -85,12 +83,10 @@ void mmapio_close(struct mmapio_i* m);
 /**
  * \brief Helper function acquires file data.
  * \param m map instance
- * \param sz size of output buffer
- * \param off offset from start of mapped region
  * \return pointer to locked space on success, NULL otherwise
  */
 MMAPIO_API
-void* mmapio_acquire(struct mmapio_i* m, size_t sz, size_t off);
+void* mmapio_acquire(struct mmapio_i* m);
 
 /**
  * \brief Helper function to release a lock of the space.

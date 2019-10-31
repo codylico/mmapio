@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
   } else {
     /* output the data */{
       size_t len = mmapio_length(mi);
-      unsigned char* bytes = (unsigned char*)mmapio_acquire(mi, len, 0);
+      unsigned char* bytes = (unsigned char*)mmapio_acquire(mi);
       if (bytes != NULL) {
         size_t i;
         if (len >= UINT_MAX-32)
