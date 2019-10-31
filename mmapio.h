@@ -111,10 +111,6 @@ MMAPIO_API
 size_t mmapio_length(struct mmapio_i const* m);
 /* END   helper functions */
 
-/* BEGIN size statistic functions */
-size_t mmapio_size_stat(char const* nm);
-/* END   size statistic functions */
-
 /* BEGIN open functions */
 /**
  * \brief Open a file using a narrow character name.
