@@ -855,17 +855,23 @@ struct mmapio_i* mmapio_wopen
   return mmapio_open_rest(fd, mt, sz, off);
 }
 #else
-struct mmapio_i* mmapio_open(char const* nm, char const* mode) {
+struct mmapio_i* mmapio_open
+  (char const* nm, char const* mode, size_t sz, size_t off)
+{
   /* no-op */
   return NULL;
 }
 
-struct mmapio_i* mmapio_u8open(unsigned char const* nm, char const* mode) {
+struct mmapio_i* mmapio_u8open
+  (unsigned char const* nm, char const* mode, size_t sz, size_t off)
+{
   /* no-op */
   return NULL;
 }
 
-struct mmapio_i* mmapio_wopen(wchar_t const* nm, char const* mode) {
+struct mmapio_i* mmapio_wopen
+  (wchar_t const* nm, char const* mode, size_t sz, size_t off)
+{
   /* no-op */
   return NULL;
 }
