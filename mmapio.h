@@ -126,6 +126,7 @@ size_t mmapio_length(struct mmapio_i const* m);
  * \note On Windows, this function uses `CreateFileA` directly.
  * \note On Unix, this function uses the `open` system call directly.
  */
+MMAPIO_API
 struct mmapio_i* mmapio_open
   (char const* nm, char const* mode, size_t sz, size_t off);
 
@@ -142,6 +143,7 @@ struct mmapio_i* mmapio_open
  *   UTF-8 to UTF-16, then uses `CreateFileW` on the result.
  * \note On Unix, this function uses the `open` system call directly.
  */
+MMAPIO_API
 struct mmapio_i* mmapio_u8open
   (unsigned char const* nm, char const* mode, size_t sz, size_t off);
 
@@ -159,6 +161,7 @@ struct mmapio_i* mmapio_u8open
  *   to a multibyte character string, then passes the result to
  *   the `open` system call. Use `setlocale` in advance if necessary.
  */
+MMAPIO_API
 struct mmapio_i* mmapio_wopen
   (wchar_t const* nm, char const* mode, size_t sz, size_t off);
 /* END   oepn functions */
