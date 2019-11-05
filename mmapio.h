@@ -27,7 +27,8 @@ extern "C" {
  */
 enum mmapio_os {
   mmapio_os_none = 0,
-  mmapio_os_unix = 1
+  mmapio_os_unix = 1,
+  mmapio_os_win32 = 2
 };
 
 /**
