@@ -164,7 +164,7 @@ struct mmapio_i* mmapio_u8open
 MMAPIO_API
 struct mmapio_i* mmapio_wopen
   (wchar_t const* nm, char const* mode, size_t sz, size_t off);
-/* END   oepn functions */
+/* END   open functions */
 
 #ifdef __cplusplus
 };
