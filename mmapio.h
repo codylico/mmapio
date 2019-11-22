@@ -39,7 +39,15 @@ enum mmapio_mode {
   mmapio_mode_write = 0x77,
   mmapio_mode_end = 0x65,
   mmapio_mode_private = 0x70,
-  mmapio_mode_bequeath = 0x71 /* TODO check API symbol */
+
+  /**
+   * \note If not using bequeath, the caller of
+   *   \link mmapio::open \endlink, \link mmapio::u8open \endlink or
+   *   \link mmapio::wopen \endlink must give time for the function
+   *   to return. Otherwise, the file descriptor of the mapped file
+   *   may leak.
+   */
+  mmapio_mode_bequeath = 0x71
 };
 
 /**
@@ -78,6 +86,16 @@ struct mmapio_i {
  */
 MMAPIO_API
 int mmapio_get_os(void);
+
+/**
+ * \brief Check whether the library can handle possible race conditions
+ *   involving file bequeath prevention. Such prevention may be necessary
+ *   when starting child processes.
+ * \return nonzero if file bequeath prevention is race-proof, zero
+ *   otherwise
+ */
+MMAPIO_API
+int mmapio_check_bequeath_stop(void);
 /* END   configurations */
 
 /* BEGIN helper functions */

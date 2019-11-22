@@ -16,5 +16,8 @@ endif (MMAPIO_OS GREATER -1)
 if (BUILD_TESTING)
   add_executable(mmapio_dump "tests/dump.c")
   target_link_libraries(mmapio_dump mmapio)
+
+  add_executable(mmapio_config "tests/config.c")
+  target_link_libraries(mmapio_config mmapio)
 endif (BUILD_TESTING)
 

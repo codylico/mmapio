@@ -4,7 +4,7 @@
  * \author Cody Licorish (svgmovement@gmail.com)
  */
 #define MMAPIO_WIN32_DLL_INTERNAL
-#define _POSIX_C_SOURCE 200112L
+#define _POSIX_C_SOURCE 200809L
 #include "mmapio.h"
 #include <stdlib.h>
 
@@ -296,11 +296,16 @@ char* mmapio_wctomb(wchar_t const* nm) {
 }
 
 int mmapio_mode_rw_cvt(int mmode) {
+#if (defined O_CLOEXEC)
+  int const fast_no_bequeath = (int)(O_CLOEXEC);
+#else
+  int const fast_no_bequeath = 0;
+#endif /*O_CLOEXEC*/
   switch (mmode) {
   case mmapio_mode_write:
-    return O_RDWR;
+    return O_RDWR|fast_no_bequeath;
   case mmapio_mode_read:
-    return O_RDONLY;
+    return O_RDONLY|fast_no_bequeath;
   default:
     return 0;
   }
@@ -343,6 +348,22 @@ struct mmapio_i* mmapio_open_rest
   if (out == NULL) {
     close(fd);
     return NULL;
+  }
+  /* assign the close-on-exec flag */{
+    int const old_flags = fcntl(fd, F_GETFD);
+    int bequeath_break = 0;
+    if (old_flags < 0) {
+      bequeath_break = 1;
+    } else if (mt.bequeath) {
+      bequeath_break = (fcntl(fd, F_SETFD, old_flags&(~FD_CLOEXEC)) < 0);
+    } else {
+      bequeath_break = (fcntl(fd, F_SETFD, old_flags|FD_CLOEXEC) < 0);
+    }
+    if (bequeath_break) {
+      close(fd);
+      free(out);
+      return NULL;
+    }
   }
   if (mt.end) /* fix map size */{
     size_t const xsz = mmapio_file_size_e(fd);
@@ -709,6 +730,20 @@ size_t mmapio_mmi_length(struct mmapio_i const* m) {
 /* BEGIN configuration functions */
 int mmapio_get_os(void) {
   return (int)(MMAPIO_OS);
+}
+
+int mmapio_check_bequeath_stop(void) {
+#if MMAPIO_OS == MMAPIO_OS_UNIX
+#  if (defined O_CLOEXEC)
+  return 1;
+#  else
+  return 0;
+#  endif /*O_CLOEXEC*/
+#elif MMAPIO_OS == MMAPIO_OS_WIN32
+  return 1;
+#else
+  return -1;
+#endif /*MMAPIO_OS*/
 }
 /* END   configuration functions */
 
