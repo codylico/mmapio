@@ -35,15 +35,32 @@ enum mmapio_os {
  * \brief File memory access modes.
  */
 enum mmapio_mode {
+  /**
+   * \brief Open for reading only.
+   */
   mmapio_mode_read = 0x72,
+  /**
+   * \brief Open for reading and writing.
+   */
   mmapio_mode_write = 0x77,
+  /**
+   * \brief Map until end of file.
+   * \note When this parameter is active, the open functions
+   *   \link mmapio_open \endlink, \link mmapio_u8open \endlink and
+   *   \link mmapio_wopen \endlink will ignore the size parameter.
+   */
   mmapio_mode_end = 0x65,
+  /**
+   * \brief Make a private mapping.
+   * \note Changes in pages remain private to the process.
+   */
   mmapio_mode_private = 0x70,
 
   /**
+   * \brief Allow child processes to inherit this mapping.
    * \note If not using bequeath, the caller of
-   *   \link mmapio::open \endlink, \link mmapio::u8open \endlink or
-   *   \link mmapio::wopen \endlink must give time for the function
+   *   \link mmapio_open \endlink, \link mmapio_u8open \endlink or
+   *   \link mmapio_wopen \endlink must give time for the function
    *   to return. Otherwise, the file descriptor of the mapped file
    *   may leak.
    */
@@ -140,7 +157,7 @@ size_t mmapio_length(struct mmapio_i const* m);
  *   optionally followed by 'p' to make write changes private
  * \param sz size in bytes of region to map
  * \param off file offset of region to map
- * \return an interface on success, NULL otherwise
+ * \return an interface on success, `NULL` otherwise
  * \note On Windows, this function uses `CreateFileA` directly.
  * \note On Unix, this function uses the `open` system call directly.
  */
@@ -156,7 +173,7 @@ struct mmapio_i* mmapio_open
  *   optionally followed by 'p' to make write changes private
  * \param sz size in bytes of region to map
  * \param off file offset of region to map
- * \return an interface on success, NULL otherwise
+ * \return an interface on success, `NULL` otherwise
  * \note On Windows, this function re-encodes the `nm` parameter from
  *   UTF-8 to UTF-16, then uses `CreateFileW` on the result.
  * \note On Unix, this function uses the `open` system call directly.
@@ -173,7 +190,7 @@ struct mmapio_i* mmapio_u8open
  *   optionally followed by 'p' to make write changes private
  * \param sz size in bytes of region to map
  * \param off file offset of region to map
- * \return an interface on success, NULL otherwise
+ * \return an interface on success, `NULL` otherwise
  * \note On Windows, this function uses `CreateFileW` directly.
  * \note On Unix, this function translates the wide string
  *   to a multibyte character string, then passes the result to

@@ -12,16 +12,24 @@
 #  define MMAPIO_MAX_CACHE 1048576
 #endif /*MMAPIO_MAX_CACHE*/
 
+/**
+ * \brief Mode tag for mmapio interface, holding various
+ *   mapping configuration values.
+ */
 struct mmapio_mode_tag {
+  /** \brief access mode (readonly, read-write) */
   char mode;
+  /** \brief map-to-end-of-file flag */
   char end;
+  /** \brief flag for activating private mapping */
   char privy;
+  /** \brief flag for enabling access from child processes */
   char bequeath;
 };
 
 /**
  * \brief Extract a mmapio mode tag from a mode text.
- * \param mmode the value to parse
+ * \param mmode the text to parse
  * \return a mmapio mode tag
  */
 static struct mmapio_mode_tag mmapio_mode_parse(char const* mmode);
@@ -54,11 +62,19 @@ static struct mmapio_mode_tag mmapio_mode_parse(char const* mmode);
 #  include <sys/stat.h>
 #  include <errno.h>
 
+/**
+ * \brief Structure for POSIX mmapio implementation.
+ */
 struct mmapio_unix {
+  /** \brief base structure */
   struct mmapio_i base;
+  /** \brief `mmap` pointer */
   void* ptr;
+  /** \brief length of space */
   size_t len;
+  /** \brief offset from `ptr` to start of user-requested space */
   size_t shift;
+  /** \brief file descriptor */
   int fd;
 };
 
@@ -70,21 +86,21 @@ struct mmapio_unix {
 static char* mmapio_wctomb(wchar_t const* nm);
 
 /**
- * \brief Convert a mmapio mode text to a POSIX `open` flag.
- * \param mmode the value to convert
+ * \brief Convert a mmapio mode character to a POSIX `open` flag.
+ * \param mmode the character to convert
  * \return an `open` flag on success, zero otherwise
  */
 static int mmapio_mode_rw_cvt(int mmode);
 
 /**
- * \brief Convert a mmapio mode text to a POSIX `mmap` protection flag.
- * \param mmode the value to convert
+ * \brief Convert a mmapio mode character to a POSIX `mmap` protection flag.
+ * \param mmode the character to convert
  * \return an `mmap` protection flag on success, zero otherwise
  */
 static int mmapio_mode_prot_cvt(int mmode);
 
 /**
- * \brief Convert a mmapio mode text to a POSIX `mmap` others' flag.
+ * \brief Convert a mmapio mode character to a POSIX `mmap` others' flag.
  * \param mprivy the private flag to convert
  * \return an `mmap` others' flag on success, zero otherwise
  */
@@ -100,7 +116,7 @@ static size_t mmapio_file_size_e(int fd);
 /**
  * \brief Finish preparing a memory map interface.
  * \param fd file descriptor
- * \param mmode mode text
+ * \param mmode mode tag
  * \param sz size of range to map
  * \param off offset from start of file
  * \return an interface on success, NULL otherwise
@@ -140,27 +156,37 @@ static size_t mmapio_mmi_length(struct mmapio_i const* m);
 #  include <limits.h>
 #  include <errno.h>
 
+/**
+ * \brief Structure for Win32 API mmapio implementation.
+ */
 struct mmapio_win32 {
+  /** \brief base structure */
   struct mmapio_i base;
+  /** \brief `MapViewOfFile` pointer */
   void* ptr;
+  /** \brief length of space */
   size_t len;
+  /** \brief offset from `ptr` to start of user-requested space */
   size_t shift;
+  /** \brief file mapping handle */
   HANDLE fmd;
+  /** \brief file handle */
   HANDLE fd;
 };
 
 /**
- * \brief Convert a mmapio mode text to a `CreateFile.` desired access flag.
- * \param mmode the value to convert
- * \return an `CreateFile.` desired access flag on success, zero otherwise
+ * \brief Convert a mmapio mode character to a `CreateFile.`
+ *   desired access flag.
+ * \param mmode the character to convert
+ * \return a `CreateFile.` desired access flag on success, zero otherwise
  */
 static DWORD mmapio_mode_rw_cvt(int mmode);
 
 /**
  * \brief Convert UTF-8 encoded text to UTF-16 LE text.
  * \param nm file name encoded in UTF-8
- * \param out output string
- * \param outlen output length
+ * \param[out] out output string
+ * \param[out] outlen output length
  * \return an errno code
  */
 static int mmapio_u8towc_shim
@@ -176,7 +202,7 @@ static wchar_t* mmapio_u8towc(unsigned char const* nm);
 /**
  * \brief Finish preparing a memory map interface.
  * \param fd file handle
- * \param mmode mode text
+ * \param mmode mode tag
  * \param sz size of range to map
  * \param off offset from start of file
  * \return an interface on success, NULL otherwise
@@ -192,17 +218,17 @@ static struct mmapio_i* mmapio_open_rest
 static size_t mmapio_file_size_e(HANDLE fd);
 
 /**
- * \brief Convert a mmapio mode text to a
+ * \brief Convert a mmapio mode character to a
  *   `CreateFileMapping.` protection flag.
- * \param mmode the value to convert
+ * \param mmode the character to convert
  * \return a `CreateFileMapping.` protection flag on success, zero otherwise
  */
 static DWORD mmapio_mode_prot_cvt(int mmode);
 
 /**
- * \brief Convert a mmapio mode text to a `MapViewOfFile`
+ * \brief Convert a mmapio mode tag to a `MapViewOfFile`
  *   desired access flag.
- * \param mmode the value to convert
+ * \param mmode the tag to convert
  * \return a `MapViewOfFile` desired access flag on success, zero otherwise
  */
 static DWORD mmapio_mode_access_cvt(struct mmapio_mode_tag const mt);
@@ -512,7 +538,7 @@ int mmapio_u8towc_shim
       n += 2;
       p += 3;
     } else {
-      return EILSEQ; /* since beyond U+1FFFFF, no valid UTF-16 encoding */
+      return EILSEQ; /* since beyond U+10FFFF, no valid UTF-16 encoding */
     }
   }
   (*outlen) = n;
@@ -910,6 +936,6 @@ struct mmapio_i* mmapio_wopen
   /* no-op */
   return NULL;
 }
-#endif /*MMAPIO_ON_UNIX*/
+#endif /*MMAPIO_OS*/
 /* END   open functions */
 
