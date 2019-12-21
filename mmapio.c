@@ -445,7 +445,7 @@ void mmapio_mmi_dtor(struct mmapio_i* m) {
 
 void* mmapio_mmi_acquire(struct mmapio_i* m) {
   struct mmapio_unix* const mu = (struct mmapio_unix*)m;
-  return mu->ptr+mu->shift;
+  return ((unsigned char*)mu->ptr)+mu->shift;
 }
 
 void mmapio_mmi_release(struct mmapio_i* m, void* p) {
@@ -570,7 +570,8 @@ size_t mmapio_file_size_e(HANDLE fd) {
 #if (defined ULLONG_MAX)
     return (size_t)sz.QuadPart;
 #else
-    return (size_t)((sz.u.LowPart)|(sz.u.HighPart<<32));
+    return ((size_t)sz.u.LowPart)
+      |    (((size_t)sz.u.HighPart)<<32);
 #endif /*ULLONG_MAX*/
   } else return 0u;
 }
@@ -665,6 +666,7 @@ struct mmapio_i* mmapio_open_rest
         } else extended_size = fullsize;
       }
     } else {
+      fullshift = 0u;
       fulloff = off;
       extended_size = sz;
     }
@@ -739,7 +741,7 @@ void mmapio_mmi_dtor(struct mmapio_i* m) {
 
 void* mmapio_mmi_acquire(struct mmapio_i* m) {
   struct mmapio_win32* const mu = (struct mmapio_win32*)m;
-  return mu->ptr+mu->shift;
+  return ((unsigned char*)mu->ptr)+mu->shift;
 }
 
 void mmapio_mmi_release(struct mmapio_i* m, void* p) {
