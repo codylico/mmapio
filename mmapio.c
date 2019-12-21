@@ -411,7 +411,10 @@ struct mmapio_i* mmapio_open_rest
         errno = ERANGE;
         return NULL;
       } else fullsize += fullshift;
-    } else fulloff = (off_t)off;
+    } else {
+      fullshift = 0u;
+      fulloff = (off_t)off;
+    }
   }
   ptr = mmap(NULL, fullsize, mmapio_mode_prot_cvt(mt.mode),
        mmapio_mode_flag_cvt(mt.privy), fd, fulloff);
