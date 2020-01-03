@@ -155,6 +155,11 @@ static size_t mmapio_mmi_length(struct mmapio_i const* m);
 #  include <windows.h>
 #  include <limits.h>
 #  include <errno.h>
+#  ifdef EILSEQ
+#    define MMAPIO_EILSEQ EILSEQ
+#  else
+#    define MMAPIO_EILSEQ EDOM
+#  endif /*EILSEQ*/
 
 /**
  * \brief Structure for Win32 API mmapio implementation.
@@ -489,7 +494,7 @@ int mmapio_u8towc_shim
       }
       n += 1;
     } else if (v < 0xC0) {
-      return EILSEQ;
+      return MMAPIO_EILSEQ;
     } else if (v < 0xE0) {
       /* check extension codes */
       unsigned int i;
@@ -497,7 +502,7 @@ int mmapio_u8towc_shim
       for (i = 0; i < 1; ++i) {
         unsigned char const v1 = *(p+i);
         if (v1 < 0x80 || v1 >= 0xC0) {
-          return EILSEQ;
+          return MMAPIO_EILSEQ;
         } else qv = (qv<<6)|(v1&63);
       }
       if (out != NULL) {
@@ -512,7 +517,7 @@ int mmapio_u8towc_shim
       for (i = 0; i < 2; ++i) {
         unsigned char const v1 = *(p+i);
         if (v1 < 0x80 || v1 >= 0xC0) {
-          return EILSEQ;
+          return MMAPIO_EILSEQ;
         } else qv = (qv<<6)|(v1&63);
       }
       if (out != NULL) {
@@ -527,11 +532,11 @@ int mmapio_u8towc_shim
       for (i = 0; i < 3; ++i) {
         unsigned char const v1 = *(p+i);
         if (v1 < 0x80 || v1 >= 0xC0) {
-          return EILSEQ;
+          return MMAPIO_EILSEQ;
         } else qv = (qv<<6)|(v1&63);
       }
       if (qv >= 0x10FFFFL) {
-        return EILSEQ;
+        return MMAPIO_EILSEQ;
       }
       if (out != NULL) {
         qv -= 0x10000;
@@ -541,7 +546,8 @@ int mmapio_u8towc_shim
       n += 2;
       p += 3;
     } else {
-      return EILSEQ; /* since beyond U+10FFFF, no valid UTF-16 encoding */
+      return MMAPIO_EILSEQ
+        /* since beyond U+10FFFF, no valid UTF-16 encoding */;
     }
   }
   (*outlen) = n;
