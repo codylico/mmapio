@@ -12,6 +12,10 @@ if (MMAPIO_OS GREATER -1)
   target_compile_definitions(mmapio
     PRIVATE "MMAPIO_OS=${MMAPIO_OS}")
 endif (MMAPIO_OS GREATER -1)
+if (WIN32 AND BUILD_SHARED_LIBS)
+  target_compile_definitions(mmapio
+    PUBLIC "MMAPIO_WIN32_DLL")
+endif(WIN32 AND BUILD_SHARED_LIBS)
 
 if (BUILD_TESTING)
   add_executable(mmapio_dump "tests/dump.c")
