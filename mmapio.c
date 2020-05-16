@@ -7,6 +7,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "mmapio.h"
 #include <stdlib.h>
+#include <errno.h>
 
 #ifndef MMAPIO_MAX_CACHE
 #  define MMAPIO_MAX_CACHE 1048576
@@ -60,7 +61,6 @@ static struct mmapio_mode_tag mmapio_mode_parse(char const* mmode);
 #  include <fcntl.h>
 #  include <sys/mman.h>
 #  include <sys/stat.h>
-#  include <errno.h>
 
 /**
  * \brief Structure for POSIX `mmapio` implementation.
@@ -154,7 +154,6 @@ static size_t mmapio_mmi_length(struct mmapio_i const* m);
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #  include <limits.h>
-#  include <errno.h>
 #  ifdef EILSEQ
 #    define MMAPIO_EILSEQ EILSEQ
 #  else
@@ -763,6 +762,17 @@ size_t mmapio_mmi_length(struct mmapio_i const* m) {
 }
 #endif /*MMAPIO_OS*/
 /* END   static functions */
+
+/* BEGIN error handling */
+int mmapio_get_errno(void) {
+  return errno;
+}
+
+void mmapio_set_errno(int x) {
+  errno = x;
+  return;
+}
+/* END   error handling */
 
 /* BEGIN configuration functions */
 int mmapio_get_os(void) {

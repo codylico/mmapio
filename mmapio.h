@@ -96,6 +96,22 @@ struct mmapio_i {
   size_t (*mmi_length)(struct mmapio_i const* m);
 };
 
+/* BEGIN error handling */
+/**
+ * \brief Get the `errno` value from this library.
+ * \return an error number
+ */
+MMAPIO_API
+int mmapio_get_errno(void);
+
+/**
+ * \brief Set an `errno` value to this library.
+ * \param x the value to set
+ */
+MMAPIO_API
+void mmapio_set_errno(int x);
+/* END   error handling */
+
 /* BEGIN configurations */
 /**
  * \brief Check the library's target backend.

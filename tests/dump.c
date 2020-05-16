@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <ctype.h>
+#include <string.h>
 
 int main(int argc, char **argv) {
   struct mmapio_i* mi;
@@ -13,11 +14,13 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   fname = argv[1];
+  mmapio_set_errno(0);
   mi = mmapio_open(fname, argv[2],
     (size_t)strtoul(argv[3],NULL,0),
     (size_t)strtoul(argv[4],NULL,0));
   if (mi == NULL) {
-    fprintf(stderr, "failed to map file '%s'\n", fname);
+    fprintf(stderr, "failed to map file '%s'\n\t%s\n", fname,
+      strerror(mmapio_get_errno()));
     return EXIT_FAILURE;
   } else {
     /* output the data */{
