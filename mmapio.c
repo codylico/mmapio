@@ -401,6 +401,12 @@ struct mmapio_i* mmapio_open_rest
       sz = 0 /*to fail*/;
     else sz = xsz-off;
   }
+  if (sz == 0) {
+    close(fd);
+    free(out);
+    errno = ERANGE;
+    return NULL;
+  }
   /* fix to page sizes */{
     long const psize = sysconf(_SC_PAGE_SIZE);
     fullsize = sz;
