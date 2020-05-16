@@ -646,12 +646,18 @@ struct mmapio_i* mmapio_open_rest
       /* reject non-ending zero parameter */
       CloseHandle(fd);
       free(out);
+      errno = ERANGE;
       return NULL;
     } else sz = xsz-off;
   } else if (sz == 0) {
     /* reject non-ending zero parameter */
     CloseHandle(fd);
     free(out);
+#if (defined EINVAL)
+      errno = EINVAL;
+#else
+      errno = EDOM;
+#endif /*EINVAL*/
     return NULL;
   }
   /* fix to allocation granularity */{
