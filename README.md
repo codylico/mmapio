@@ -19,7 +19,7 @@ Unix and Windows. The target API language is C 89. In addition:
 
 ## Build
 
-This project will use CMake for building. Developers can obtain CMake from
+This project uses CMake for building. Developers can obtain CMake from
 the following URL:
 [https://cmake.org/download/](https://cmake.org/download/)
 
