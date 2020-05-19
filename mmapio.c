@@ -428,7 +428,7 @@ struct mmapio_i* mmapio_open_rest
   }
   ptr = mmap(NULL, fullsize, mmapio_mode_prot_cvt(mt.mode),
        mmapio_mode_flag_cvt(mt.privy), fd, fulloff);
-  if (ptr == NULL) {
+  if (ptr == MAP_FAILED) {
     close(fd);
     free(out);
     return NULL;
